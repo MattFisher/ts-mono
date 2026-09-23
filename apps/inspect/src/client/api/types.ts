@@ -1,3 +1,4 @@
+import type { NormalizedEvalStats } from "@tsmono/inspect-common/normalize";
 import type {
   AppConfig,
   ApprovalEvent,
@@ -28,6 +29,7 @@ import type {
   ModelFallback,
   ModelUsage,
   Result,
+  ReviewEvent,
   SampleInitEvent,
   SampleLimitEvent,
   SandboxEvent,
@@ -74,7 +76,7 @@ export interface LogDetails {
   eval: EvalSpec;
   plan?: EvalPlan;
   results?: EvalResults | null;
-  stats?: EvalStats;
+  stats?: NormalizedEvalStats;
   error?: EvalError | null;
   tags?: string[];
   metadata?: Record<string, unknown>;
@@ -180,6 +182,7 @@ export interface EventData {
     | ModelEvent
     | ToolEvent
     | ApprovalEvent
+    | ReviewEvent
     | InputEvent
     | ScoreEvent
     | ErrorEvent
@@ -442,7 +445,7 @@ export interface EvalHeader {
   eval: EvalSpec;
   plan?: EvalPlan;
   results?: EvalResults | null;
-  stats?: EvalStats;
+  stats?: NormalizedEvalStats;
   error?: EvalError | null;
   tags?: string[];
   metadata?: Record<string, unknown>;
@@ -592,7 +595,7 @@ export interface LogRoot {
 
 export interface LogContents {
   raw: string;
-  parsed: EvalLog;
+  parsed: EvalLog & { stats: NormalizedEvalStats };
 }
 
 export interface LogFilesFetchResponse {

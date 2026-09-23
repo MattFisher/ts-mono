@@ -11,10 +11,13 @@ import { directoryRelativeUrl } from "@tsmono/util";
 import {
   decodeUrlParam,
   logSamplesUrl,
+  logsUrl,
   parseLogRouteParams,
   parseSamplesRouteParams,
   printSampleUrl,
   samplesSampleUrl,
+  samplesUrl,
+  tasksUrl,
 } from "./url";
 
 describe("parseLogRouteParams", () => {
@@ -414,6 +417,43 @@ describe("decodeUrlParam", () => {
   });
 });
 
+describe("names with a malformed percent sequence", () => {
+  // Log names come from the directory listing, so a literal "%" that is not
+  // valid percent-encoding must build a link rather than throw.
+  test.each([
+    ["100%done.eval", "/logs/100%25done.eval"],
+    ["50%-subset/run%zz.json", "/logs/50%25-subset/run%25zz.json"],
+  ])("logsUrl builds a link for %j", (name, expected) => {
+    expect(logsUrl(name, "/logs")).toBe(expected);
+  });
+
+  test("tasksUrl and samplesUrl build links", () => {
+    expect(tasksUrl("/logs/100%done.eval", "/logs")).toBe(
+      "/tasks/100%25done.eval"
+    );
+    expect(samplesUrl("/logs/100%done.eval", "/logs")).toBe(
+      "/samples/100%25done.eval"
+    );
+  });
+
+  test("the built link parses back to the same log path", () => {
+    const url = logsUrl("/logs/50%-subset/100%done.eval", "/logs");
+    const splat = url.replace(/^\/logs\//, "");
+    expect(parseLogRouteParams(splat).logPath).toBe("50%-subset/100%done.eval");
+  });
+
+  test("a hash route naming such a file builds sample links", () => {
+    const url = logSamplesUrl("50%-subset/100%done.eval", "s1", 1);
+    expect(url).toBe("/logs/50%25-subset/100%25done.eval/samples/sample/s1/1/");
+  });
+
+  test("already-encoded segments still round-trip unchanged", () => {
+    expect(logsUrl("nested%20dir/a%2Bb.eval")).toBe(
+      "/logs/nested%20dir/a%2Bb.eval"
+    );
+  });
+});
+
 describe("sample IDs with slashes", () => {
   test("logSamplesUrl encodes slashes in sample IDs", () => {
     const url = logSamplesUrl(
@@ -446,6 +486,23 @@ describe("sample IDs with slashes", () => {
     );
     expect(url).toContain("ascii%2Fcar");
     expect(url).toContain("?view=transcript");
+  });
+
+  test("printSampleUrl appends one events param per selected event", () => {
+    const url = printSampleUrl(
+      "path/to/file.eval",
+      "s1",
+      1,
+      "transcript",
+      "/logs",
+      ["ev/1", "ev-2"]
+    );
+    expect(url).toContain("?view=transcript&events=ev%2F1&events=ev-2");
+  });
+
+  test("printSampleUrl omits the events param without a selection", () => {
+    const url = printSampleUrl("path/to/file.eval", "s1", 1, "transcript");
+    expect(url.endsWith("?view=transcript")).toBe(true);
   });
 
   test("parseLogRouteParams decodes slashes in sample IDs", () => {

@@ -41,7 +41,12 @@ import type {
   ToolEvent,
 } from "@tsmono/inspect-common/types";
 
-import { eventSearchText, eventsToStr, extractEventFields } from "./eventText";
+import {
+  eventSearchText,
+  eventsToMarkdown,
+  eventsToStr,
+  extractEventFields,
+} from "./eventText";
 import { EventNode } from "./types";
 
 const reasoning = (r: Partial<ContentReasoning>): ContentReasoning => ({
@@ -67,6 +72,88 @@ const modelEventWith = (
       ],
     }),
   });
+
+describe("eventsToMarkdown", () => {
+  it("renders readable event headings and labeled fields", () => {
+    const out = eventsToMarkdown([
+      modelEventWith("A concise answer."),
+      modelEventWith("A second answer."),
+    ]);
+
+    expect(out).toContain("## Model");
+    expect(out).toContain("**Model:** test/model");
+    expect(out).toContain("**Output:** A concise answer.");
+    expect(out).toContain("\n\n---\n\n");
+  });
+
+  it("quotes multi-line prose without exposing redacted reasoning", () => {
+    const out = eventsToMarkdown([
+      modelEventWith([
+        reasoning({
+          reasoning: "OPAQUE_SIGNATURE_BLOB",
+          summary: "First line\nSecond line",
+          redacted: true,
+        }),
+      ]),
+    ]);
+
+    expect(out).toContain("> First line\n> Second line");
+    expect(out).not.toContain("OPAQUE_SIGNATURE_BLOB");
+  });
+
+  it("fences multi-line and JSON tool results so Markdown does not reinterpret them", () => {
+    const out = eventsToMarkdown([
+      testToolEvent({
+        function: "bash",
+        result: "# not a heading\n- not a list",
+      }),
+      testToolEvent({ function: "sh", result: '{"cmd":"ls *_test.py"}' }),
+    ]);
+    expect(out).toContain("```\n# not a heading\n- not a list\n```");
+    expect(out).toContain('```\n{"cmd":"ls *_test.py"}\n```');
+  });
+
+  it("uses the viewer's event title as the section heading", () => {
+    const out = eventsToMarkdown([
+      testToolEvent({ function: "bash", arguments: { cmd: "ls" } }),
+    ]);
+    expect(out).toContain("## Tool: bash");
+  });
+
+  it("puts code-like single-line fields in inline code", () => {
+    const out = eventsToMarkdown([
+      testToolEvent({
+        function: "bash",
+        arguments: { cmd: 'grep -r "__init__" *.py' },
+      }),
+    ]);
+    expect(out).toContain("**Function:** `bash`");
+    expect(out).toContain('```\n{"cmd":"grep -r \\"__init__\\" *.py"}\n```');
+  });
+
+  it("keeps a heading for an event with nothing to extract", () => {
+    const out = eventsToMarkdown([testStateEvent({ changes: [] })]);
+    expect(out.startsWith("## ")).toBe(true);
+  });
+
+  it("collapses a multi-line title onto the heading line", () => {
+    const out = eventsToMarkdown([
+      testToolEvent({
+        function: "bash",
+        arguments: { cmd: "a\nb" },
+        view: { title: "Bash: {{cmd}}", format: "text", content: "" },
+      }),
+    ]);
+    expect(out).toContain("## Tool: Bash: a b\n");
+  });
+
+  it("extends the fence past backtick runs inside the value", () => {
+    const out = eventsToMarkdown([
+      testToolEvent({ function: "bash", result: "line\n```\nnested\n```" }),
+    ]);
+    expect(out).toContain("````\nline\n```\nnested\n```\n````");
+  });
+});
 
 describe("eventsToStr — reasoning content", () => {
   it("uses summary when redacted (Anthropic ≥4, OpenAI encrypted)", () => {

@@ -1,7 +1,11 @@
 import { useCallback, useMemo } from "react";
 import { useLocation, useParams } from "react-router";
 
-import { directoryRelativeUrl, encodePathParts } from "@tsmono/util";
+import {
+  directoryRelativeUrl,
+  encodePathParts,
+  tryDecodeURIComponent,
+} from "@tsmono/util";
 
 import { useLogDir } from "../../app_config";
 import {
@@ -21,12 +25,7 @@ export const decodeUrlParam = (
   param: string | undefined
 ): string | undefined => {
   if (!param) return param;
-  try {
-    return decodeURIComponent(param);
-  } catch {
-    // If decoding fails, return the original string
-    return param;
-  }
+  return tryDecodeURIComponent(param);
 };
 
 /**
@@ -403,19 +402,27 @@ export const logSamplesUrl = (
   }
 };
 
+/**
+ * Print route for a sample tab. `eventIds` narrows a transcript print to the
+ * selected events (one `events=` param each, so ids never need a separator).
+ */
 export const printSampleUrl = (
   logPath: string,
   sampleId: string | number,
   epoch: string | number,
   view: string,
-  prefix: RoutePrefix = "/logs"
+  prefix: RoutePrefix = "/logs",
+  eventIds?: readonly string[]
 ) => {
   const decodedLogPath = decodeUrlParam(logPath) || logPath;
   const encodedSampleId = encodeURIComponent(String(sampleId));
+  const eventParams = (eventIds ?? [])
+    .map((id) => `&events=${encodeURIComponent(id)}`)
+    .join("");
   return (
     encodePathParts(
       `${prefix}/${decodedLogPath}/samples/sample/${encodedSampleId}/${epoch}/print`
-    ) + `?view=${view}`
+    ) + `?view=${view}${eventParams}`
   );
 };
 
