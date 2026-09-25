@@ -1479,6 +1479,8 @@ export interface components {
             location?: string | null;
             /** Name */
             name?: string | null;
+            /** Revision */
+            revision?: string | null;
             /** Sample Ids */
             sample_ids?: string[] | number[] | (string | number)[] | null;
             /** Samples */
